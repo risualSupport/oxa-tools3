@@ -345,10 +345,8 @@ retry-command()
 
         log "STARTING ${message}..."
 
-        set -o pipefail
-        eval "$command" | tee /var/tmp/${a}.txt
+        eval "$command"
         result=$?
-        set +o pipefail
 
         if [[ $result -eq 0 ]] ; then
             log "SUCCEEDED ${message}!"
