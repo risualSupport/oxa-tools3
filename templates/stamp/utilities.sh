@@ -149,8 +149,12 @@ install-git()
     if type git >/dev/null 2>&1 ; then
         log "Git already installed"
     else
-        install-wrapper "git" $ERROR_GITINSTALL_FAILED
+        apt-wrapper "update"
+        apt-wrapper "install git"
+        exit_on_error "Failed to install the GIT client on ${HOSTNAME} !" $ERROR_GITINSTALL_FAILED
     fi
+
+    log "Git client installed"
 }
 
 #############################################################################
@@ -161,10 +165,14 @@ install-gettext()
 {
     # Ensure that gettext (which includes envsubst) is installed
     if [[ $(dpkg-query -W -f='${Status}' gettext 2>/dev/null | grep -c "ok installed") -eq 0 ]] ; then
-        install-wrapper "gettext"
+        apt-wrapper "update"
+        apt-wrapper "install gettext"
+        exit_on_error "Failed to install the GetText package on ${HOSTNAME} !"
     else
         log "Get Text is already installed"
     fi
+
+    log "Get Text installed"
 }
 
 #############################################################################
@@ -191,8 +199,15 @@ install-mongodb-shell()
             echo "deb ${PACKAGE_URL} "${SHORT_CODENAME}"/mongodb-org/3.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-3.0.list
         fi
 
-        install-wrapper "mongodb-org-shell" $ERROR_MONGOCLIENTINSTALL_FAILED
+        log "Updating Repository"
+        apt-get update
+
+        log "Installing Mongo Shell"
+        apt-get install -y mongodb-org-shell
+        exit_on_error "Failed to install the Mongo client on ${HOSTNAME} !" $ERROR_MONGOCLIENTINSTALL_FAILED
     fi
+
+    log "Mongo Shell installed"
 }
 
 #############################################################################
@@ -207,8 +222,11 @@ install-mongodb-tools()
         log "mongodump and mongorestore are already installed"
     else
         log "Installing Mongo Tools (mongodump and mongorestore)"
-        install-wrapper "mongodb-org-tools" $ERROR_MONGOCLIENTINSTALL_FAILED
+        apt-get install -y mongodb-org-tools
+        exit_on_error "Failed to install the Mongo dump/restore on ${HOSTNAME} !" $ERROR_MONGOCLIENTINSTALL_FAILED
     fi
+
+    log "Mongo Tools installed"
 }
 
 
@@ -221,8 +239,12 @@ install-bc()
     if type bc >/dev/null 2>&1; then
         log "BC is already installed"
     else
-        install-wrapper "bc" $ERROR_BCINSTALL_FAILED
+        log "Installing BC"
+        apt-get install -y bc
+        exit_on_error "Failed to install BC on ${HOSTNAME} !" $ERROR_BCINSTALL_FAILED
     fi
+
+    log "BC utility installed"
 }
 
 #############################################################################
@@ -234,16 +256,21 @@ install-mysql-client()
     if type mysql >/dev/null 2>&1; then
         log "Mysql Client is already installed"
     else
+        log "Updating Repository"
+        apt-get update -y -qq
+
         log "Installing Mysql Client"
         RELEASE_DESCRIPTION=`lsb_release -sd`
 
         if [[ $RELEASE_DESCRIPTION =~ "14.04" ]]; then
           log "Installing Mysql Client 5.5 for '$RELEASE_DESCRIPTION'"
-          install-wrapper "mysql-client-core-5.5" $ERROR_MYSQLCLIENTINSTALL_FAILED
+          apt-get install -y mysql-client-core-5.5
         else
           log "Installing Mysql Client Core * for '$RELEASE_DESCRIPTION'"
-          install-wrapper "mysql-client-core*" $ERROR_MYSQLCLIENTINSTALL_FAILED
+          apt-get install -y mysql-client-core*
         fi
+
+        exit_on_error "Failed to install the Mysql client on ${HOSTNAME} !" $ERROR_MYSQLCLIENTINSTALL_FAILED
     fi
 
     log "Mysql client installed"
@@ -258,8 +285,15 @@ install-mysql-dump()
     if type mysqldump >/dev/null 2>&1; then
         log "Mysql Dump is already installed"
     else
-        install-wrapper "mysql-client" $ERROR_MYSQLCLIENTINSTALL_FAILED
+        log "Updating Repository"
+        apt-get update -y -qq
+
+        log "Installing Mysql Dump"
+        apt-get install -y mysql-client
+        exit_on_error "Failed to install the Mysql dump on ${HOSTNAME} !" $ERROR_MYSQLCLIENTINSTALL_FAILED
     fi
+
+    log "Mysql dump installed"
 }
 
 #############################################################################
@@ -271,8 +305,15 @@ install-mysql-utilities()
     if type mysqlfailover >/dev/null 2>&1; then
         log "Mysql Utilities is already installed"
     else
-        install-wrapper "mysql-utilities" $ERROR_MYSQLUTILITIESINSTALL_FAILED
+        log "Updating Repository"
+        apt-get update -y -qq
+
+        log "Installing Mysql Utilities"
+        apt-get install -y mysql-utilities
+        exit_on_error "Failed to install the Mysql utilities on ${HOSTNAME} !" $ERROR_MYSQLUTILITIESINSTALL_FAILED
     fi
+
+    log "Mysql client installed"
 }
 
 #############################################################################
@@ -281,22 +322,8 @@ install-mysql-utilities()
 
 apt-wrapper()
 {
-    operation="$1"
-
-    log "$operation package(s)..."
-    apt-get $operation -y -qq --fix-missing
-}
-
-install-wrapper()
-{
-    package="$1"
-    error_code="$2"
-
-    apt-wrapper "update"
-    apt-wrapper "install $package"
-    exit_on_error "Installing $package Failed on $HOSTNAME" $error_code
-
-    log "$package installed"
+    log "$1 package(s)..."
+    apt $1 -y -qq --fix-missing
 }
 
 retry-command()
@@ -313,17 +340,14 @@ retry-command()
         if [[ -n "$fix_packages" ]] ; then
             apt-wrapper "update"
             apt-wrapper "install -f"
+            apt-wrapper "upgrade -f"
             dpkg --configure -a
         fi
 
-        install-unbuffer
-
         log "STARTING ${message}..."
 
-        set -o pipefail
-        unbuffer $command | tee /var/tmp/${a}.txt
+        eval "$command"
         result=$?
-        set +o pipefail
 
         if [[ $result -eq 0 ]] ; then
             log "SUCCEEDED ${message}!"
@@ -347,21 +371,11 @@ install-sudo()
         return
     fi
 
-    install-wrapper "sudo"
-}
+    apt-wrapper "update"
+    apt-wrapper "install sudo"
+    exit_on_error "Installing sudo Failed on $HOST"
 
-#############################################################################
-# Setup expect-dev (for unbuffer)
-#############################################################################
-
-install-unbuffer()
-{
-    if type unbuffer >/dev/null 2>&1 ; then
-        log "unbuffer already installed"
-        return
-    fi
-
-    install-wrapper "expect-dev"
+    log "sudo installed"
 }
 
 #############################################################################
@@ -375,7 +389,11 @@ install-ssh()
         return
     fi
 
-    install-wrapper "ssh"
+    apt-wrapper "update"
+    apt-wrapper "install ssh"
+    exit_on_error "Installing SSH Failed on $HOST"
+
+    log "SSH installed"
 }
 
 setup-ssh()
@@ -740,17 +758,24 @@ install-azure-cli()
     if type azure >/dev/null 2>&1; then
         log "Azure CLI is already installed"
     else
+        log "Updating Repository"
+        apt-get -y -qq update
+
         # Note: nodejs-legacy is required for Ubuntu14 and above.
         short_release_number=`lsb_release -sr`
         if [[ "$short_release_number" > 13 ]]; then
-            install-wrapper "nodejs-legacy" $ERROR_NODEINSTALL_FAILED
+            log "Installing nodejs-legacy"
+            apt-get install -y nodejs-legacy
+            exit_on_error "Failed to install nodejs-legacy on ${HOSTNAME} !" $ERROR_NODEINSTALL_FAILED
         fi
 
         if type npm >/dev/null 2>&1; then
             log "npm is already installed"
         else
+            log "Installing npm"
             # aptitude install npm -y
-            install-wrapper "npm" $ERROR_NODEINSTALL_FAILED
+            apt-get install -y npm
+            exit_on_error "Failed to install npm on ${HOSTNAME} !" $ERROR_NODEINSTALL_FAILED
         fi
 
         log "Installing azure cli"
@@ -776,24 +801,28 @@ install-azure-cli-2()
         log "Adding Azure Cli 2.0 Repository for package installation"
         echo "deb [arch=amd64] https://apt-mo.trafficmanager.net/repos/azure-cli/ wheezy main" | tee /etc/apt/sources.list.d/azure-cli.list
         apt-key adv --keyserver apt-mo.trafficmanager.net --recv-keys 417A0893
-
-        log "Installing Azure CLI 2.0 pre-requisites"
-        install-wrapper "apt-transport-http"
+    
+        log "Updating Repository"
+        apt-get update -y -qq
 
         short_release_number=`lsb_release -sr`
 
+        log "Installing Azure CLI 2.0 pre-requisites"
+        apt-get -y install apt-transport-http
+
         if [[ $(echo "$short_release_number > 15" | bc -l) ]]; then
-            install-wrapper "libssl-dev libffi-dev python-dev build-essential"
+            sudo apt-get install -y libssl-dev libffi-dev python-dev build-essential
 
         elif [[ $(echo "$short_release_number > 12" | bc -l) ]]; then
-            install-wrapper "libssl-dev libffi-dev python-dev"
+            sudo apt-get install -y libssl-dev libffi-dev python-dev
 
         else
             exit $ERROR_AZURECLI_INVALID_OSVERSION
         fi
 
         log "Installing Azure CLI 2.0"
-        install-wrapper "azure-cli" $ERROR_AZURECLI2_INSTALLATION_FAILED
+        apt-get -y install azure-cli
+        exit_on_error "Failed installing azure cli 2.0 on ${HOSTNAME} !" $ERROR_AZURECLI2_INSTALLATION_FAILED
     fi
 }
 
@@ -806,8 +835,15 @@ install-json-processor()
     if type jq >/dev/null 2>&1; then
         log "JSON Processor is already installed"
     else
-        install-wrapper "jq"
+        log "Updating Repository"
+        apt-get -y -qq update
+
+        log "Installing jq - Command-line JSON processor"
+        apt-get install -y jq
+        exit_on_error "Failed to install jq"
     fi
+
+    log "JSON Processor installed"
 }
 
 #############################################################################
@@ -828,7 +864,7 @@ install-mailer()
     log "Installing Mail Utilities"
 
     log "Updating Repository"
-    apt-wrapper "update"
+    apt-get update
 
     log "Install packages in non-interactive mode"
     debconf-set-selections <<< "postfix postfix/main_mailer_type string 'No Configuration'"
@@ -1047,8 +1083,16 @@ install_haproxy()
     if type haproxy >/dev/null 2>&1; then
         log "HA Proxy is already installed"
     else
-        install-wrapper "haproxy" $ERROR_GITINSTALL_FAILED
+        log "Installing HA Proxy"
+
+        log "Updating Repository"
+        apt-get update
+
+        apt-get install -y haproxy
+        exit_on_error "Failed to install the HAProxy ${HOSTNAME} !" $ERROR_GITINSTALL_FAILED
     fi
+
+    log "HAProxy installed"
 }
 
 start_haproxy()
@@ -1562,8 +1606,16 @@ install-xinetd()
     if type xinetd >/dev/null 2>&1; then
         log "xinet is already installed"
     else
-        install-wrapper "xinetd" $ERROR_XINETD_INSTALLER_FAILED
+        log "Installing Xinet service"
+
+        log "Updating Repository"
+        apt-get update
+
+        apt-get install -y xinetd
+        exit_on_error "Failed to install xinet service on ${HOSTNAME} !" $ERROR_XINETD_INSTALLER_FAILED
     fi
+
+    log "Xinet service installed"
 }
 
 #############################################################################
