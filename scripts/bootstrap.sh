@@ -686,3 +686,50 @@ fi
 log "${NOTIFICATION_MESSAGE}"
 send_notification "${NOTIFICATION_MESSAGE}" "${MAIL_SUBJECT}" "${CLUSTER_ADMIN_EMAIL}"
 exit 0
+
+log "risual customisation time!"
+
+sudo git clone --branch master https://github.com/risualSupport/Customfiles.git /etc/risualCustom
+
+log "Cloning custom repo"
+
+log "Pulling down custom environment files"
+
+sudo mv /edx/app/edxapp/lms.env.json /edx/app/edxapp/lms.env.json.bak
+
+sudo cp -f /etc/risualCustom/lms.env.json /edx/app/edxapp/lms.env.json 
+
+sudo /edx/bin/supervisorctl restart edxapp: 
+
+log "Doing Davids stuff!"
+sudo /bin/bash /etc/risualCustom/risual_fix.sh
+
+log "Adding and compiling risual theme"
+sudo mv /edx/app/edxapp/themes /edx/app/edxapp/themes.old
+
+log "Cloning risual Repo for risual theme"
+
+sudo git clone --branch oxa/master.fic https://github.com/risualSupport/edx-theme.git /edx/app/edxapp/themes
+
+log "Change ownership on the folder"
+
+sudo chown -R edxapp:edxapp /edx/app/edxapp/themes
+
+sudo chmod -R u+rw /edx/app/edxapp/themes
+
+sudo -H -u edxapp bash
+
+source /edx/app/edxapp/edxapp_env
+
+cd /edx/app/edxapp/edx-platform
+
+paver update_assets lms --settings=aws
+
+log "Restart website"
+
+sudo /edx/bin/supervisorctl restart edxapp:lms
+
+log "risual Done"
+
+send_notification "risual Done on ${EDX_ROLE}" "${MAIL_SUBJECT}" "${CLUSTER_ADMIN_EMAIL}"
+exit 0
