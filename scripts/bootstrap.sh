@@ -711,20 +711,6 @@ log "Cloning risual Repo for risual theme"
 
 sudo git clone --branch oxa/master.fic https://github.com/risualSupport/edx-theme.git /edx/app/edxapp/themes
 
-log "Change ownership on the folder"
-
-sudo chown -R edxapp:edxapp /edx/app/edxapp/themes
-
-sudo chmod -R u+rw /edx/app/edxapp/themes
-
-sudo -H -u edxapp bash
-
-source /edx/app/edxapp/edxapp_env
-
-cd /edx/app/edxapp/edx-platform
-
-paver update_assets lms --settings=aws
-
 log "Restart website"
 
 sudo /edx/bin/supervisorctl restart edxapp:lms
